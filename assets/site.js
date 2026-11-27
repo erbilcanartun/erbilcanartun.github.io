@@ -122,6 +122,42 @@
   }
 
   /* The three artworks share a canvas, motion preference, theme, and scale control. */
+  // About mark: a dot field on a saddle surface with a slow ripple. Same formulas as surface_point in build.py.
+  const surface = document.querySelector('.about-mark[data-surface]');
+  if (surface && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const dots = [...surface.querySelectorAll('circle[data-x]')].map(dot => [dot, +dot.dataset.x, +dot.dataset.y]);
+    const surfacePoint = (x, y, t) => {
+      const z = .6 * (y * y - x * x) + .05 * Math.sin(4.2 * x + 2.6 * y - t) + .03 * Math.sin(3.1 * y - 1.7 * x + .7 * t);
+      const xr = x * Math.cos(1) - y * Math.sin(1);
+      const yr = x * Math.sin(1) + y * Math.cos(1);
+      const up = z * Math.cos(.8) + yr * Math.sin(.8);
+      const depth = yr * Math.cos(.8) - z * Math.sin(.8);
+      const scale = 5 / (5 + depth);
+      return [118.4 + 85 * xr * scale, 79.8 - 85 * up * scale, 1.25 * scale, Math.max(.15, Math.min(.95, .55 + .7 * z - .15 * depth))];
+    };
+    let surfaceFrame = 0;
+    let surfaceVisible = false;
+    let last = 0;
+    let phase = 0;
+    const step = now => {
+      phase += Math.min(now - (last || now), 100) * .0006;
+      last = now;
+      for (const [dot, x, y] of dots) {
+        const [px, py, r, alpha] = surfacePoint(x, y, phase);
+        dot.setAttribute('cx', px.toFixed(1));
+        dot.setAttribute('cy', py.toFixed(1));
+        dot.setAttribute('r', r.toFixed(2));
+        dot.setAttribute('fill-opacity', alpha.toFixed(2));
+      }
+      surfaceFrame = surfaceVisible && !document.hidden ? requestAnimationFrame(step) : 0;
+    };
+    const run = () => {
+      if (surfaceVisible && !document.hidden && !surfaceFrame) { last = 0; surfaceFrame = requestAnimationFrame(step); }
+    };
+    document.addEventListener('visibilitychange', run);
+    new IntersectionObserver(entries => { surfaceVisible = entries[0].isIntersecting; run(); }).observe(surface);
+  }
+
   const canvas = document.getElementById('sculpture');
   if (!canvas) return;
   const context = canvas.getContext('2d', { alpha: true });

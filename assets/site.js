@@ -122,28 +122,30 @@
   }
 
   /* The three artworks share a canvas, motion preference, theme, and scale control. */
-  // About mark: a dot field on a saddle surface with a slow ripple. Same formulas as surface_point in build.py.
+  // About mark: irregular data points on a slowly moving surface. Same formula as surface_view in build.py.
   const surface = document.querySelector('.about-mark[data-surface]');
   if (surface && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const { waves, view: [yaw, tilt, focal, scale, ox, oy] } = JSON.parse(surface.dataset.surface);
     const dots = [...surface.querySelectorAll('circle[data-x]')].map(dot => [dot, +dot.dataset.x, +dot.dataset.y]);
-    const surfacePoint = (x, y, t) => {
-      const z = .6 * (y * y - x * x) + .05 * Math.sin(4.2 * x + 2.6 * y - t) + .03 * Math.sin(3.1 * y - 1.7 * x + .7 * t);
-      const xr = x * Math.cos(1) - y * Math.sin(1);
-      const yr = x * Math.sin(1) + y * Math.cos(1);
-      const up = z * Math.cos(.8) + yr * Math.sin(.8);
-      const depth = yr * Math.cos(.8) - z * Math.sin(.8);
-      const scale = 5 / (5 + depth);
-      return [118.4 + 85 * xr * scale, 79.8 - 85 * up * scale, 1.25 * scale, Math.max(.15, Math.min(.95, .55 + .7 * z - .15 * depth))];
+    const place = (x, y, t) => {
+      let z = 0;
+      for (const [a, kx, ky, w, f] of waves) z += a * Math.sin(kx * x + ky * y - w * t + f);
+      const xr = x * Math.cos(yaw) - y * Math.sin(yaw);
+      const yr = x * Math.sin(yaw) + y * Math.cos(yaw);
+      const up = z * Math.cos(tilt) + yr * Math.sin(tilt);
+      const depth = yr * Math.cos(tilt) - z * Math.sin(tilt);
+      const s = focal / (focal + depth);
+      return [ox + scale * xr * s, oy - scale * up * s, 1.15 * s, Math.max(.15, Math.min(.95, .5 + 1.4 * z - .15 * depth))];
     };
     let surfaceFrame = 0;
     let surfaceVisible = false;
     let last = 0;
-    let phase = 0;
+    let time = 0;
     const step = now => {
-      phase += Math.min(now - (last || now), 100) * .0006;
+      time += Math.min(now - (last || now), 100) / 1000;
       last = now;
       for (const [dot, x, y] of dots) {
-        const [px, py, r, alpha] = surfacePoint(x, y, phase);
+        const [px, py, r, alpha] = place(x, y, time);
         dot.setAttribute('cx', px.toFixed(1));
         dot.setAttribute('cy', py.toFixed(1));
         dot.setAttribute('r', r.toFixed(2));
